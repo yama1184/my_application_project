@@ -1,0 +1,70 @@
+[
+  {
+    "name": "豚の生姜焼き",
+    "ingredients": [
+      { "name": "豚肉", "quantity": 250, "unit": "g" },
+      { "name": "玉ねぎ", "quantity": 1, "unit": "個" },
+      { "name": "生姜", "quantity": 10, "unit": "g" },
+      { "name": "醤油", "quantity": 2, "unit": "大さじ" },
+      { "name": "みりん", "quantity": 2, "unit": "大さじ" }
+    ],
+    "person_count": 2,
+    "instructions": [
+      "玉ねぎを薄切りにする。",
+      "豚肉に醤油、みりん、すりおろした生姜をもみこむ。",
+      "フライパンを熱し、玉ねぎと豚肉を炒める。",
+      "豚肉に火が通ったら、残りの調味料を加えて煮詰める。"
+    ]
+  },
+  {
+    "name": "鶏肉と野菜のトマト煮",
+    "ingredients": [
+      { "name": "鶏肉", "quantity": 200, "unit": "g" },
+      { "name": "玉ねぎ", "quantity": 0.5, "unit": "個" },
+      { "name": "人参", "quantity": 0.5, "unit": "本" },
+      { "name": "トマト缶", "quantity": 1, "unit": "缶" },
+      { "name": "コンソメ", "quantity": 1, "unit": "個" }
+    ],
+    "person_count": 2,
+    "instructions": [
+      "鶏肉と野菜を一口大に切る。",
+      "鍋にオリーブオイルを熱し、鶏肉と野菜を炒める。",
+      "トマト缶とコンソメを加えて煮込む。",
+      "具材が柔らかくなったら完成。"
+    ]
+  },
+  {
+    "name": "豚バラ大根",
+    "ingredients": [
+      { "name": "豚肉", "quantity": 200, "unit": "g" },
+      { "name": "大根", "quantity": 300, "unit": "g" },
+      { "name": "醤油", "quantity": 3, "unit": "大さじ" },
+      { "name": "砂糖", "quantity": 2, "unit": "大さじ" },
+      { "name": "みりん", "quantity": 2, "unit": "大さじ" }
+    ],
+    "person_count": 2,
+    "instructions": [
+      "大根と豚肉を食べやすい大きさに切る。",
+      "鍋に大根、豚肉、調味料をすべて入れる。",
+      "落し蓋をして、大根が柔らかくなるまで煮込む。"
+    ]
+  },
+  {
+    "name": "親子丼",
+    "ingredients": [
+      { "name": "鶏肉", "quantity": 150, "unit": "g" },
+      { "name": "玉ねぎ", "quantity": 0.5, "unit": "個" },
+      { "name": "卵", "quantity": 2, "unit": "個" },
+      { "name": "醤油", "quantity": 2, "unit": "大さじ" },
+      { "name": "砂糖", "quantity": 1, "unit": "大さじ" }
+    ],
+    "person_count": 1,
+    "instructions": [
+      "鶏肉を一口大に、玉ねぎは薄切りにする。",
+      "フライパンに水、醤油、砂糖を入れ沸騰させる。",
+      "鶏肉と玉ねぎを加え、火が通るまで煮る。",
+      "溶いた卵を回し入れ、蓋をして半熟になったら火を止める。",
+      "ご飯の上に盛り付ける。"
+    ]
+  }
+]
