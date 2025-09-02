@@ -12,9 +12,9 @@ class PantryListData {
 
   factory PantryListData.fromJson(Map<String, dynamic> json) {
     return PantryListData(
-      name: json['name'],
-      quantity: json['quantity']?.toDouble() ?? 0.0,
-      unit: json['unit'],
+      name: json['name'] as String,
+      quantity: json['quantity'] as double,
+      unit: json['unit'] as String,
     );
   }
 

@@ -1,16 +1,13 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
-import 'stock_check_page.dart';
-import 'shopping_list_page.dart';
-import 'recipe_data.dart';
-import 'pantry_list_data.dart';
-import 'recipe_selection_page.dart';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
-import 'shopping_list_data.dart';
+import 'dart:convert';
+import 'pantry_list_data.dart';
+import 'shopping_list_page.dart';
+import 'stock_check_page.dart';
 
-void main() => runApp(const MyApp());
+void main() {
+  runApp(const MyApp());
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -21,30 +18,13 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   int _selectedIndex = 0;
-  final Map<String, List<PantryListData>> _pantryList = {
-    '主食': [PantryListData(name: '米', quantity: 1, unit: 'g')],
-    '肉': [PantryListData(name: '豚肉', quantity: 300, unit: 'g')],
-    '野菜': [
-      PantryListData(name: 'じゃがいも', quantity: 2, unit: '個'),
-      PantryListData(name: '玉ねぎ', quantity: 1, unit: '個')
-    ],
-  };
-  final Map<String, List<String>> _categoryIngredients = {
-    '主食': ['米', 'パスタ', 'パン'],
-    '肉': ['豚肉', '鶏肉', '牛肉'],
-    '野菜': ['じゃがいも', '人参', '玉ねぎ', 'キャベツ'],
-    '調味料': ['醤油', 'みりん', '砂糖', '塩', 'こしょう', '酒'],
-    '乳製品・卵': ['牛乳', 'チーズ', 'バター', '卵'],
-    'その他': ['小麦粉', '片栗粉'],
-  };
-  final Map<String, ShoppingListItem> _shoppingList = {};
-  final Map<String, int> _ingredientUsageCount = {};
-  Recipe? _selectedRecipe;
-  final Map<String, List<String>> _stockList = {
-    '調味料': ['醤油', 'みりん', '砂糖', '塩', 'こしょう'],
-    '日用品': ['トイレットペーパー', '洗剤'],
-    'その他': [],
-  };
+  Map<String, List<String>> _categoryIngredients = {};
+  Map<String, List<PantryListData>> _pantryList = {};
+  Map<String, List<dynamic>> _shoppingList = {};
+  Map<String, int> _ingredientUsageCount = {};
+  Map<String, int> _pantryItemCounts = {};
+  List<String> _stockList = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -52,393 +32,348 @@ class _MyAppState extends State<MyApp> {
     _loadData();
   }
 
-  void _onItemTapped(int index) {
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 🔴 修正: カテゴリを強制的にリセットする
+    //await prefs.remove('categoryIngredients');
+
+    final String? categoriesJson = prefs.getString('categoryIngredients');
+    if (categoriesJson == null || categoriesJson == '{}') {
+      _categoryIngredients = {
+        '主食': ['米', 'パン', '麺'],
+        '肉類': [
+          '鶏肉',
+          '鶏もも肉',
+          '鶏むね肉',
+          '豚肉',
+          '牛肉',
+          '牛バラ肉',
+          '牛もも肉',
+          '豚バラ肉',
+          '豚もも肉',
+          'ひき肉'
+        ],
+        '魚類': ['鮭', 'マグロ', 'サンマ', 'サバ', 'ブリ', 'アジ'],
+        '野菜': [
+          'キャベツ',
+          '玉ねぎ',
+          '人参',
+          'じゃがいも',
+          'トマト',
+          'ピーマン',
+          '白菜',
+          'レタス',
+          'ねぎ',
+          'ほうれん草',
+          'なす'
+        ],
+        '調味料': ['塩', '砂糖', 'しょう油', '味噌', '油', '酢', 'マヨネーズ', 'ケチャップ', 'だし'],
+        '乳製品・卵': ['牛乳', '卵', 'チーズ', 'ヨーグルト', 'バター'],
+        'その他': ['食器洗剤', 'トイレットぺーパー', '洗濯洗剤', 'シャンプー', 'ボディソープ', 'ごみ袋'],
+      };
+      await prefs.setString(
+          'categoryIngredients', jsonEncode(_categoryIngredients));
+    } else {
+      _categoryIngredients = _decodeCategoryIngredients(categoriesJson);
+    }
+
     setState(() {
-      _selectedIndex = index;
+      _pantryList = _decodePantryList(prefs.getString('pantryList') ?? '{}');
+      _shoppingList =
+          _decodeShoppingList(prefs.getString('shoppingList') ?? '{}');
+      _ingredientUsageCount = _decodeIngredientUsage(
+          prefs.getString('ingredientUsageCount') ?? '{}');
+      _pantryItemCounts =
+          _decodePantryItemCounts(prefs.getString('pantryItemCounts') ?? '{}');
+
+      final stockListFromPrefs = prefs.get('stockList');
+      if (stockListFromPrefs is List<dynamic>) {
+        _stockList = List<String>.from(stockListFromPrefs);
+      } else {
+        _stockList = [];
+        prefs.remove('stockList');
+      }
+
+      _isLoading = false;
     });
-    _saveData();
   }
 
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-
-    final Map<String, dynamic> pantryJson = _pantryList.map(
-        (key, value) => MapEntry(key, value.map((e) => e.toJson()).toList()));
-    await prefs.setString('pantryList', jsonEncode(pantryJson));
-
-    final Map<String, dynamic> shoppingJson =
-        _shoppingList.map((key, value) => MapEntry(key, {
-              'ingredientName': value.ingredientName,
-              'quantity': value.quantity,
-              'unit': value.unit,
-              'sources': value.sources
-                  .map((source) => {
-                        'recipeName': source.recipeName,
-                        'servings': source.servings,
-                      })
-                  .toList(),
-            }));
-    await prefs.setString('shoppingList', jsonEncode(shoppingJson));
-
-    await prefs.setString(
-        'categoryIngredients', jsonEncode(_categoryIngredients));
-
-    final List<Map<String, dynamic>> recipesJson = recipes
-        .map((e) => {
-              'name': e.name,
-              'imagePath': e.imagePath,
-              'ingredients': e.ingredients,
-              'instructions': e.instructions,
-            })
-        .toList();
-    await prefs.setString('recipes', jsonEncode(recipesJson));
-
-    await prefs.setString('stockList', jsonEncode(_stockList));
+    prefs.setString('categoryIngredients', jsonEncode(_categoryIngredients));
+    prefs.setString('pantryList', jsonEncode(_encodePantryList()));
+    prefs.setString('shoppingList', jsonEncode(_shoppingList));
+    prefs.setString('ingredientUsageCount', jsonEncode(_ingredientUsageCount));
+    prefs.setString('pantryItemCounts', jsonEncode(_pantryItemCounts));
+    prefs.setStringList('stockList', _stockList);
   }
 
-  Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final String? pantryJsonString = prefs.getString('pantryList');
-    if (pantryJsonString != null) {
-      final Map<String, dynamic> pantryJson = jsonDecode(pantryJsonString);
-      setState(() {
-        _pantryList.clear();
-        pantryJson.forEach((key, value) {
-          _pantryList[key] =
-              (value as List).map((e) => PantryListData.fromJson(e)).toList();
-        });
-      });
-    }
-
-    final String? shoppingJsonString = prefs.getString('shoppingList');
-    if (shoppingJsonString != null) {
-      final Map<String, dynamic> shoppingJson = jsonDecode(shoppingJsonString);
-      setState(() {
-        _shoppingList.clear();
-        shoppingJson.forEach((key, value) {
-          final sources = (value['sources'] as List)
-              .map(
-                (sourceJson) => RecipeSource(
-                  recipeName: sourceJson['recipeName'],
-                  servings: sourceJson['servings'],
-                ),
-              )
-              .toList();
-          _shoppingList[key] = ShoppingListItem(
-            ingredientName: value['ingredientName'],
-            quantity: value['quantity'],
-            unit: value['unit'],
-            sources: sources,
-          );
-        });
-      });
-    }
-
-    final String? categoryJsonString = prefs.getString('categoryIngredients');
-    if (categoryJsonString != null) {
-      final Map<String, dynamic> categoryJson = jsonDecode(categoryJsonString);
-      setState(() {
-        _categoryIngredients.clear();
-        categoryJson.forEach((key, value) {
-          _categoryIngredients[key] =
-              (value as List).map((e) => e.toString()).toList();
-        });
-      });
-    }
-
-    final String? recipesJsonString = prefs.getString('recipes');
-    if (recipesJsonString != null) {
-      final List<dynamic> recipesJson = jsonDecode(recipesJsonString);
-      setState(() {
-        recipes.clear();
-        recipesJson.forEach((json) {
-          recipes.add(Recipe(
-            name: json['name'],
-            imagePath: json['imagePath'],
-            ingredients: (json['ingredients'] as Map<String, dynamic>).map(
-              (key, value) => MapEntry(key, value as Map<String, dynamic>),
-            ),
-            instructions: (json['instructions'] as List)
-                .map((e) => e.toString())
-                .toList(),
-          ));
-        });
-      });
-    }
-
-    final String? stockListJsonString = prefs.getString('stockList');
-    if (stockListJsonString != null) {
-      final Map<String, dynamic> stockListJson =
-          jsonDecode(stockListJsonString);
-      setState(() {
-        _stockList.clear();
-        stockListJson.forEach((key, value) {
-          _stockList[key] = (value as List).map((e) => e.toString()).toList();
-        });
-      });
-    }
+  Map<String, List<String>> _decodeCategoryIngredients(String jsonString) {
+    final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+    return decoded
+        .map((key, value) => MapEntry(key, List<String>.from(value as List)));
   }
 
-  void _addNewIngredientToCategory(String category, String newIngredient) {
-    if (!_categoryIngredients.containsKey(category)) {
-      _categoryIngredients[category] = [];
-    }
-    if (!_categoryIngredients[category]!.contains(newIngredient)) {
-      _categoryIngredients[category]!.add(newIngredient);
-    }
-    _saveData();
+  Map<String, dynamic> _encodePantryList() {
+    return _pantryList.map((category, items) => MapEntry(
+        category,
+        items
+            .map((item) => {
+                  'name': item.name,
+                  'quantity': item.quantity,
+                  'unit': item.unit,
+                })
+            .toList()));
   }
 
-  void _onItemsAdded(Map<String, Map<String, dynamic>> itemsToAdd,
-      String recipeName, int servings) {
-    setState(() {
-      itemsToAdd.forEach((ingredient, itemData) {
-        final double quantity = itemData['quantity'] as double;
-        final String unit = itemData['unit'] as String;
-
-        final newSource =
-            RecipeSource(recipeName: recipeName, servings: servings);
-
-        if (_shoppingList.containsKey(ingredient)) {
-          _shoppingList[ingredient]!.quantity += quantity;
-          final existingSources = _shoppingList[ingredient]!.sources;
-          final isSourceExists = existingSources.any((source) =>
-              source.recipeName == recipeName && source.servings == servings);
-          if (!isSourceExists) {
-            existingSources.add(newSource);
-          }
-        } else {
-          _shoppingList[ingredient] = ShoppingListItem(
-            ingredientName: ingredient,
-            quantity: quantity,
-            unit: unit,
-            sources: [newSource],
-          );
-        }
-      });
-    });
-    _saveData();
+  Map<String, List<PantryListData>> _decodePantryList(String jsonString) {
+    final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+    return decoded.map((key, value) => MapEntry(
+        key,
+        (value as List)
+            .map((item) => PantryListData(
+                  name: item['name'],
+                  quantity: item['quantity']?.toDouble() ?? 0.0,
+                  unit: item['unit'] ?? '個',
+                ))
+            .toList()));
   }
 
-  void _onStockItemAddedToShoppingList(String category, String item) {
-    setState(() {
-      if (!_shoppingList.containsKey(item)) {
-        _shoppingList[item] = ShoppingListItem(
-          ingredientName: item,
-          quantity: 1,
-          unit: '',
-          sources: [RecipeSource(recipeName: 'ストック', servings: 0)],
-        );
+  Map<String, List<dynamic>> _decodeShoppingList(String jsonString) {
+    if (jsonString.isEmpty || jsonString == '{}') return {};
+    final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+    return decoded.map((key, value) {
+      if (value is List) {
+        return MapEntry(key, List<dynamic>.from(value));
+      } else {
+        return MapEntry(key, [value?.toDouble() ?? 1.0, '個']);
       }
     });
-    _saveData();
   }
 
-  // --- 修正箇所 ---
-  // onAddStockItemの引数をPantryListDataに変更
-  void _onAddStockItem(String category, PantryListData item) {
+  Map<String, int> _decodeIngredientUsage(String jsonString) {
+    final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+    return decoded.map((key, value) => MapEntry(key, value as int));
+  }
+
+  Map<String, int> _decodePantryItemCounts(String jsonString) {
+    final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+    return decoded.map((key, value) => MapEntry(key, value as int));
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  void _addStockItem(String category, PantryListData item) {
     setState(() {
       if (!_pantryList.containsKey(category)) {
         _pantryList[category] = [];
       }
-      final existingItem = _pantryList[category]!.firstWhere(
-        (pantryItem) => pantryItem.name == item.name,
-        orElse: () => PantryListData(name: '', quantity: 0, unit: ''),
-      );
-
-      if (existingItem.name.isNotEmpty) {
-        existingItem.quantity = item.quantity;
-        existingItem.unit = item.unit;
+      final existingItemIndex =
+          _pantryList[category]!.indexWhere((i) => i.name == item.name);
+      if (existingItemIndex != -1) {
+        _pantryList[category]![existingItemIndex] = item;
       } else {
         _pantryList[category]!.add(item);
       }
+      _pantryList[category]!.sort((a, b) => a.name.compareTo(b.name));
+      _saveData();
     });
-    _saveData();
   }
 
-  // onRemoveStockItemの引数をPantryListDataに変更
-  void _onRemoveStockItem(String category, String item) {
+  void _removeStockItem(String category, String item) {
     setState(() {
-      if (_pantryList.containsKey(category)) {
-        _pantryList[category]!
-            .removeWhere((pantryItem) => pantryItem.name == item);
+      _pantryList[category]?.removeWhere((i) => i.name == item);
+      if (_pantryList[category]?.isEmpty ?? false) {
+        _pantryList.remove(category);
       }
-      if (_stockList.containsKey(category)) {
-        _stockList[category]!.remove(item);
-      }
+      _saveData();
     });
-    _saveData();
-  }
-  // ----------------
-
-  void _onItemChecked(String itemName) {
-    setState(() {
-      _shoppingList.remove(itemName);
-    });
-    _saveData();
   }
 
-  void _onItemsBulkDeleted(List<String> itemsToDelete) {
+  void _addToShoppingList(String item, String unit) {
     setState(() {
-      for (var item in itemsToDelete) {
+      _shoppingList[item] = [1.0, unit];
+      _saveData();
+    });
+  }
+
+  void _removeItemFromShoppingList(String item) {
+    setState(() {
+      _shoppingList.remove(item);
+      _saveData();
+    });
+  }
+
+  void _editShoppingItemQuantity(
+      String item, double newQuantity, String newUnit) {
+    setState(() {
+      _shoppingList[item] = [newQuantity, newUnit];
+      if (newQuantity <= 0) {
         _shoppingList.remove(item);
       }
+      _saveData();
     });
-    _saveData();
   }
 
-  void _addRecipe(Recipe recipe) {
+  void _addToStockList(String item) {
     setState(() {
-      recipes.add(recipe);
-    });
-    _saveData();
-  }
-
-  void _deleteRecipe(Recipe recipe) {
-    setState(() {
-      recipes.remove(recipe);
-    });
-    _saveData();
-    if (!recipe.imagePath.startsWith('assets/')) {
-      final file = File(recipe.imagePath);
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
-    }
-  }
-
-  void _onRecipeEdited(Recipe originalRecipe, Recipe updatedRecipe) {
-    setState(() {
-      final index = recipes.indexOf(originalRecipe);
-      if (index != -1) {
-        recipes[index] = updatedRecipe;
+      if (!_stockList.contains(item)) {
+        _stockList.add(item);
+        _saveData();
       }
     });
-    _saveData();
-
-    if (!originalRecipe.imagePath.startsWith('assets/') &&
-        originalRecipe.imagePath != updatedRecipe.imagePath) {
-      final file = File(originalRecipe.imagePath);
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
-    }
   }
 
-  void _reorderRecipes(int oldIndex, int newIndex) {
+  void _removeFromStockList(String item) {
     setState(() {
-      if (newIndex > oldIndex) {
-        newIndex -= 1;
-      }
-      final Recipe item = recipes.removeAt(oldIndex);
-      recipes.insert(newIndex, item);
+      _stockList.remove(item);
+      _saveData();
     });
-    _saveData();
   }
 
-  List<List<Recipe>> _classifyRecipesByPantry() {
-    final List<String> availableIngredients = _pantryList.values
-        .expand((items) => items.map((item) => item.name))
-        .toList();
+  void _addNewIngredientToCategory(
+      String category, String newIngredient, String unit) {
+    setState(() {
+      if (!_categoryIngredients.containsKey(category)) {
+        _categoryIngredients[category] = [];
+      }
+      if (!_categoryIngredients[category]!.contains(newIngredient)) {
+        _categoryIngredients[category]!.add(newIngredient);
+        final newPantryItem =
+            PantryListData(name: newIngredient, quantity: 0, unit: unit);
+        if (!_pantryList.containsKey(category)) {
+          _pantryList[category] = [];
+        }
+        if (!_pantryList[category]!.any((item) => item.name == newIngredient)) {
+          _pantryList[category]!.add(newPantryItem);
+        }
+        _saveData();
+      }
+    });
+  }
 
-    final List<Recipe> cookableRecipes = [];
-    final List<Recipe> missingIngredientsRecipes = [];
+  void _updateCategoryIngredient(String oldCategory, String oldIngredient,
+      String newCategory, String newIngredient, String newUnit) {
+    setState(() {
+      _categoryIngredients[oldCategory]?.remove(oldIngredient);
+      _pantryList[oldCategory]
+          ?.removeWhere((item) => item.name == oldIngredient);
+      if (_pantryList[oldCategory]?.isEmpty ?? false) {
+        _pantryList.remove(oldCategory);
+      }
 
-    for (var recipe in recipes) {
-      final List<String> missing = [];
-      for (var ingredient in recipe.ingredients.keys) {
-        if (!availableIngredients.contains(ingredient)) {
-          missing.add(ingredient);
+      if (!_categoryIngredients.containsKey(newCategory)) {
+        _categoryIngredients[newCategory] = [];
+      }
+      if (!_categoryIngredients[newCategory]!.contains(newIngredient)) {
+        _categoryIngredients[newCategory]!.add(newIngredient);
+        _categoryIngredients[newCategory]!.sort();
+      }
+
+      if (!_pantryList.containsKey(newCategory)) {
+        _pantryList[newCategory] = [];
+      }
+      final newPantryItem =
+          PantryListData(name: newIngredient, quantity: 0, unit: newUnit);
+      if (!_pantryList[newCategory]!
+          .any((item) => item.name == newIngredient)) {
+        _pantryList[newCategory]!.add(newPantryItem);
+      }
+
+      _saveData();
+    });
+  }
+
+  void _removeCategoryIngredient(String category, String ingredient) {
+    setState(() {
+      _categoryIngredients[category]?.remove(ingredient);
+      _pantryList[category]?.removeWhere((item) => item.name == ingredient);
+      if (_pantryList[category]?.isEmpty ?? false) {
+        _pantryList.remove(category);
+      }
+      _saveData();
+    });
+  }
+
+  void _addItemsToShoppingList(Map<String, double> itemsToAdd) {
+    setState(() {
+      itemsToAdd.forEach((item, quantity) {
+        _shoppingList.putIfAbsent(item, () => [quantity, '個']);
+      });
+      _saveData();
+    });
+  }
+
+  String _getUnitForIngredient(String ingredient) {
+    for (var categoryList in _pantryList.values) {
+      for (var item in categoryList) {
+        if (item.name == ingredient) {
+          return item.unit;
         }
       }
-      if (missing.isEmpty) {
-        cookableRecipes.add(recipe);
-      } else {
-        recipe.missingIngredients = missing;
-        missingIngredientsRecipes.add(recipe);
-      }
     }
-
-    return [cookableRecipes, missingIngredientsRecipes];
+    return '個';
   }
 
   @override
   Widget build(BuildContext context) {
-    final classifiedRecipes = _classifyRecipesByPantry();
-    final cookableRecipes = classifiedRecipes[0];
-    final missingRecipes = classifiedRecipes[1];
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final List<Widget> _widgetOptions = <Widget>[
+      StockCheckPage(
+        categoryIngredients: _categoryIngredients,
+        pantryList: _pantryList,
+        ingredientUsageCount: _ingredientUsageCount,
+        saveData: _saveData,
+        addNewIngredientToCategory: _addNewIngredientToCategory,
+        onItemsAdded: _addItemsToShoppingList,
+        onAddToShoppingList: _addToShoppingList,
+        onRemoveStockItem: _removeStockItem,
+        onAddStockItem: _addStockItem,
+        onAddToStockList: _addToStockList,
+        updateCategoryIngredient: _updateCategoryIngredient,
+        removeCategoryIngredient: _removeCategoryIngredient,
+      ),
+      ShoppingListPage(
+        shoppingList: _shoppingList,
+        onRemoveItem: _removeItemFromShoppingList,
+        onEditItem: _editShoppingItemQuantity,
+        addNewIngredientToCategory: _addNewIngredientToCategory,
+        onItemsAdded: _addItemsToShoppingList,
+        onAddToShoppingList: _addToShoppingList,
+        categoryIngredients: _categoryIngredients,
+        stockList: _stockList,
+        onRemoveFromStockList: _removeFromStockList,
+        getUnitForIngredient: _getUnitForIngredient,
+      ),
+    ];
 
     return MaterialApp(
-      title: 'パントリー管理アプリ',
-      theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
       home: Scaffold(
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            // パントリー画面
-            StockCheckPage(
-              pantryList: _pantryList,
-              ingredientUsageCount: _ingredientUsageCount,
-              saveData: _saveData,
-              onItemsAdded: (itemsToAdd) {
-                itemsToAdd.forEach((key, value) {
-                  _onItemsAdded(
-                    {
-                      key: {'quantity': value, 'unit': ''}
-                    },
-                    'ストック補充',
-                    0,
-                  );
-                });
-              },
-              categoryIngredients: _categoryIngredients,
-              onAddToShoppingList: _onStockItemAddedToShoppingList,
-              stockList: _stockList,
-              onRemoveStockItem: _onRemoveStockItem,
-              onAddStockItem: _onAddStockItem,
-              addNewIngredientToCategory: _addNewIngredientToCategory,
-            ),
-            // 買い物リスト画面
-            ShoppingListPage(
-              shoppingList: _shoppingList,
-              onItemChecked: _onItemChecked,
-              onItemsBulkDeleted: _onItemsBulkDeleted,
-              stockList: _stockList,
-              onAddToShoppingList: _onStockItemAddedToShoppingList,
-              onAddStockItem: _onAddStockItem,
-              onRemoveStockItem: _onRemoveStockItem,
-            ),
-            // レシピ画面
-            RecipeSelectionPage(
-              onItemsAdded: _onItemsAdded,
-              pantryList: _pantryList,
-              onRecipeRegistered: _addRecipe,
-              onRecipeDeleted: _deleteRecipe,
-              onRecipeEdited: _onRecipeEdited,
-              onReorder: _reorderRecipes,
-              cookableRecipes: cookableRecipes,
-              missingRecipes: missingRecipes,
-            ),
-          ],
+        body: Center(
+          child: _widgetOptions.elementAt(_selectedIndex),
         ),
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'パントリー'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.check_circle_outline),
+              label: 'パントリー',
+            ),
             BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart),
               label: '買い物リスト',
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'レシピ'),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: Colors.deepPurple,
-          unselectedItemColor: Colors.grey,
+          selectedItemColor: Colors.amber[800],
           onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
         ),
       ),
     );
