@@ -21,6 +21,7 @@ class StockCheckPage extends StatefulWidget {
   final Function(String oldCategory, String oldIngredient, String newCategory,
       String newIngredient, String newUnit) updateCategoryIngredient;
   final Function(String category, String ingredient) removeCategoryIngredient;
+  final List<String> stockList; // 新たに追加されたstockListを受け取るためのfinal変数
 
   const StockCheckPage({
     super.key,
@@ -36,6 +37,7 @@ class StockCheckPage extends StatefulWidget {
     required this.onAddToStockList,
     required this.updateCategoryIngredient,
     required this.removeCategoryIngredient,
+    required this.stockList,
   });
 
   @override
@@ -100,12 +102,35 @@ class _StockCheckPageState extends State<StockCheckPage> {
   }
 
   void _showAddToCartDialog(BuildContext context, PantryListData item) {
+    final bool isStocked = widget.stockList.contains(item.name);
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('${item.name}の在庫がなくなりましたか？'),
-          content: const Text('買い物リストに追加しますか？'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isStocked)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle,
+                          color: Colors.green, size: 20),
+                      const SizedBox(width: 8),
+                      const Text('ストックリストに追加済みです',
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              const Text('買い物リストに追加しますか？'),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -119,7 +144,12 @@ class _StockCheckPageState extends State<StockCheckPage> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
+                // 🔴 修正: ストックリストにない場合のみパントリーから削除
                 widget.onAddToStockList(item.name);
+                if (!isStocked) {
+                  widget.onRemoveStockItem(
+                      _getCategoryForIngredient(item.name), item.name);
+                }
               },
               child: const Text('ストックに追加'),
             ),
@@ -542,6 +572,7 @@ class _StockCheckPageState extends State<StockCheckPage> {
               itemCount: allPantryItems.length,
               itemBuilder: (context, index) {
                 final item = allPantryItems[index];
+                final isStocked = widget.stockList.contains(item.name);
                 return Card(
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(

@@ -340,6 +340,7 @@ class _MyAppState extends State<MyApp> {
         onAddToStockList: _addToStockList,
         updateCategoryIngredient: _updateCategoryIngredient,
         removeCategoryIngredient: _removeCategoryIngredient,
+        stockList: _stockList,
       ),
       ShoppingListPage(
         shoppingList: _shoppingList,
